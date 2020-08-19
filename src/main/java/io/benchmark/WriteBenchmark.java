@@ -20,16 +20,17 @@ public class WriteBenchmark {
 
     static int arrLen = 0;
 
-    static int[] lenArr = {32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384, 134217728, 1073741824};
+    // 32, 64, 128, 512,
+    static int[] lenArr = {1024, 2048, 4096, 8192, 16384, 32768, 524288, 134217728};
 
     public static void main(String[] args) throws Exception {
         for (int i : lenArr) {
-            arrLen = i;
-            MmapBM.write();
-            FileChannelBM.write();
-            RandomAccessFileBM.write();
-            FileOutputStreamBM.write();
             System.out.println("============================== length : " + i);
+            arrLen = i;
+            FileChannelBM.write();
+//            RandomAccessFileBM.write();
+//            FileOutputStreamBM.write();
+            MmapBM.write();
         }
     }
 
@@ -53,27 +54,32 @@ public class WriteBenchmark {
 //            long s2 = System.currentTimeMillis();
 //            System.out.println("force : " + (s2 - s1));
             long e = System.currentTimeMillis();
-            System.out.println("MappedByteBuffer cost : " + (e - s));
+            System.out.print("MappedByteBuffer cost : " + (e - s) + "ms");
+            mb.force();
+            System.out.println(", force time: " + (System.currentTimeMillis() - e) + "ms");
         }
     }
 
     static class FileChannelBM {
 
         static void write() throws IOException {
-            FileChannel fc = FileUtil.getFileChannel();
+            try (FileChannel fc = FileUtil.getFileChannel(true)) {
 
-            byte[] arr = new byte[arrLen];
-            Arrays.fill(arr, (byte) 2);
+                byte[] arr = new byte[arrLen];
+                Arrays.fill(arr, (byte) 2);
 
-            int length = 0;
-            long s = System.currentTimeMillis();
-            ByteBuffer b = ByteBuffer.wrap(arr);
-            while (length < fileSize) {
-                length += arr.length;
-                fc.write(b);
+                int length = 0;
+                long s = System.currentTimeMillis();
+                ByteBuffer b = ByteBuffer.allocate(arrLen);
+                b.put(arr);
+                while (length < fileSize) {
+                    length += arr.length;
+                    fc.write(b);
+                    b.flip();
+                }
+                long e = System.currentTimeMillis();
+                System.out.println("FileChannel cost : " + (e - s) + "ms");
             }
-            long e = System.currentTimeMillis();
-            System.out.println("FileChannel cost : " + (e - s));
         }
     }
 
@@ -81,19 +87,20 @@ public class WriteBenchmark {
 
         static void write() throws IOException {
 
-            RandomAccessFile ra = FileUtil.getRandomAccessFile();
+            try (RandomAccessFile ra = FileUtil.getRandomAccessFile(true)) {
 
-            byte[] arr = new byte[arrLen];
-            Arrays.fill(arr, (byte) 2);
-            long s = System.currentTimeMillis();
-            int length = 0;
-            while (length < fileSize) {
-                length += arr.length;
-                ra.write(arr);
+                byte[] arr = new byte[arrLen];
+                Arrays.fill(arr, (byte) 2);
+                long s = System.currentTimeMillis();
+                int length = 0;
+                while (length < fileSize) {
+                    length += arr.length;
+                    ra.write(arr);
+                }
+
+                long e = System.currentTimeMillis();
+                System.out.println("RandomAccessFile cost : " + (e - s) + "ms");
             }
-
-            long e = System.currentTimeMillis();
-            System.out.println("RandomAccessFile cost : " + (e - s));
         }
     }
 
@@ -102,18 +109,19 @@ public class WriteBenchmark {
         static void write() throws IOException {
             File file = FileUtil.getRandomFile();
 
-            FileOutputStream fo = new FileOutputStream(file);
+            try (FileOutputStream fo = new FileOutputStream(file)) {
 
-            byte[] arr = new byte[arrLen];
-            Arrays.fill(arr, (byte) 2);
-            long s = System.currentTimeMillis();
-            int length = 0;
-            while (length < fileSize) {
-                length += arr.length;
-                fo.write(arr);
+                byte[] arr = new byte[arrLen];
+                Arrays.fill(arr, (byte) 2);
+                long s = System.currentTimeMillis();
+                int length = 0;
+                while (length < fileSize) {
+                    length += arr.length;
+                    fo.write(arr);
+                }
+                long e = System.currentTimeMillis();
+                System.out.println("FileOutputStream cost : " + (e - s) + "ms");
             }
-            long e = System.currentTimeMillis();
-            System.out.println("FileOutputStream cost : " + (e - s));
         }
     }
 }

@@ -6,6 +6,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 /**
  *
@@ -20,7 +21,7 @@ public class AsyncForceBenchmark {
 
     static int page4 = 1024 * 4 * 4;
 
-    static int[] lenArr = {32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384, 134217728, 1073741824};
+    static int[] lenArr = {32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384, 134217728};
 
     public static void main(String[] args) throws Exception {
         for (int i : lenArr) {
@@ -44,19 +45,16 @@ public class AsyncForceBenchmark {
 
             CountDownLatch latch = new CountDownLatch(1);
 
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    for (; ; ) {
-                        if (length > page4 && length % page4 == 0) {
-                            mb.force();
-                        }
-                        if (latch.getCount() == 0) {
-                            break;
-                        }
+            Executors.newFixedThreadPool(1).execute(() -> {
+                for (; ; ) {
+                    if (length > page4 && length % page4 == 0) {
+                        mb.force();
+                    }
+                    if (latch.getCount() == 0) {
+                        break;
                     }
                 }
-            }).start();
+            });
 
             long s = System.currentTimeMillis();
             while (length < mb.capacity()) {
@@ -75,28 +73,25 @@ public class AsyncForceBenchmark {
         static volatile int length = 0;
 
         static void write() throws IOException {
-            FileChannel fc = FileUtil.getFileChannel();
+            FileChannel fc = FileUtil.getFileChannel(true);
 
             byte[] arr = new byte[arrLen];
             Arrays.fill(arr, (byte) 2);
             CountDownLatch latch = new CountDownLatch(1);
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    for (; ; ) {
-                        if (length < page4 && length % page4 == 0) {
-                            try {
-                                fc.force(false);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        if (latch.getCount() == 0) {
-                            break;
+            Executors.newFixedThreadPool(1).execute(() -> {
+                for (; ; ) {
+                    if (length < page4 && length % page4 == 0) {
+                        try {
+                            fc.force(false);
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
                     }
+                    if (latch.getCount() == 0) {
+                        break;
+                    }
                 }
-            }).start();
+            });
 
             long s = System.currentTimeMillis();
             ByteBuffer b = ByteBuffer.wrap(arr);
@@ -110,6 +105,4 @@ public class AsyncForceBenchmark {
             System.out.println("FileChannel cost : " + (e - s));
         }
     }
-
-
 }

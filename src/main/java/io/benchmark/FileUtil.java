@@ -1,10 +1,6 @@
 package io.benchmark;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
@@ -21,32 +17,34 @@ public class FileUtil {
         String fileName = UUID.randomUUID().toString();
 
         File file = new File(fileName);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            @Override
-            public void run() {
-                file.delete();
-            }
-        }));
+        file.deleteOnExit();
         return file;
     }
 
-    static RandomAccessFile getRandomAccessFile() throws IOException {
-        File file = FileUtil.getAlreadyFillFile();
-        RandomAccessFile ra = new RandomAccessFile(file, "r");
-        return ra;
+    static RandomAccessFile getRandomAccessFile(boolean isWrite) throws IOException {
+        File file;
+        if (isWrite) {
+            file = FileUtil.getRandomFile();
+        } else {
+            file = FileUtil.getAlreadyFillFile();
+        }
+        return new RandomAccessFile(file, "rw");
     }
 
-    static FileChannel getFileChannel() throws FileNotFoundException {
-        File file = FileUtil.getRandomFile();
-        FileChannel fc = new RandomAccessFile(file, "rw").getChannel();
-        return fc;
+    static FileChannel getFileChannel(boolean isWrite) throws IOException {
+        File file;
+        if (isWrite) {
+            file = FileUtil.getRandomFile();
+        } else {
+            file = FileUtil.getAlreadyFillFile();
+        }
+        return new RandomAccessFile(file, "rw").getChannel();
     }
 
     static MappedByteBuffer getMappedByteBuffer() throws IOException {
         File file = FileUtil.getRandomFile();
-        MappedByteBuffer mb = new RandomAccessFile(file, "rw").getChannel().
+        return new RandomAccessFile(file, "rw").getChannel().
             map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 1024 * 1024);
-        return mb;
     }
 
     static File getAlreadyFillFile() throws IOException {
@@ -58,4 +56,12 @@ public class FileUtil {
         return file;
     }
 
+    static File getAlreadyFillFile(int size) throws IOException {
+        File file = getRandomFile();
+        FileOutputStream fo = new FileOutputStream(file);
+        byte[] arr = new byte[size];
+        Arrays.fill(arr, (byte) 1);
+        fo.write(arr);
+        return file;
+    }
 }
